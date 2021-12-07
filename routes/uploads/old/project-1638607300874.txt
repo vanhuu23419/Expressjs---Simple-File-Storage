@@ -1,0 +1,48 @@
+=============================
+- regex
+- file upload / large file upload
+- working with date
+- email
+- session 
+- cookie
+- cache
+- IP address 
+===========================================================
+Học về Authentication:
+- authentication
+
+Luyện làm việc với API:
+- payment api
+- social network api
+
+Luyện tổng hợp với framework:
+- web crawler: best laptop for my budget
+- some admin app ( PHP ) : book rental admin
+- product recommendation engine: wordpress + laravel
+
+Luyện thiết kế database:
+- design database: school database, ... 
+
+Học RESTFUL:
+- making simple api
+
+
+============================================================
+
+Fill up the database with some fake data, then use SQL to answer the following questions:
+
+How many math teachers does our school have?
+
+What classes does Mr. Peterson teach?
+
+Who are Cindy’s instructors?
+
+What is Toms grade in History?
+
+Give me a list of all of Mrs. Weddell’s students
+
+Give me a list of all the students taking a Chemistry class
+
+===
+https://hackernoon.com/15-project-ideas-for-front-end-back-end-and-full-stack-web-developers-j06k35pi
+https://gist.github.com/MWins/41c6fec2122dd47fdfaca31924647499
