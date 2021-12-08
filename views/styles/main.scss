@@ -11,6 +11,7 @@
 
 .txt-primary { color: var(--color-primary); }
 .bg-primary { background-color: var(--color-primary); }
+.bg-prime { background-color: var(--color-primary); }
 .txt-danger { color: var(--color-danger); }
 .bg-danger { background-color: var(--color-danger); }
 .txt-warning { color: var(--color-warning); }
@@ -52,12 +53,26 @@ button[disabled="disabled"] {
   }
 }
 
-.fileUploadGrid {
+.w2ui-grid[name="fileUploadGrid"] {
   #pauseBtn { display: inline-flex;}
   #continueBtn {display: none;}
 
   &.paused {
     #pauseBtn { display: none;}
     #continueBtn {display: inline-flex;}
+  }
+}
+
+
+ul.dash-menu__items {
+
+  li {
+    margin-bottom: 5px;
+    padding: 5px 10px;
+
+    &.current,&:hover {
+
+      background-color: #f5f5f5;
+    }
   }
 }

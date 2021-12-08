@@ -11,10 +11,18 @@ const SessionSchema = new Schema({
   data: String
 })
 
-const SessionModel = db.model('Session', SessionSchema, 'Session')
+
+
+const FileSchema = new Schema({
+  fileID: String,
+  file_name: String,
+  created_date: String,
+  size: String,
+  type: String,
+})
 
 //
 //
 //
 
-module.exports = { SessionModel }
+module.exports = { SessionSchema, FileSchema }

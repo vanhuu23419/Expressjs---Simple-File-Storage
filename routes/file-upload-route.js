@@ -1,11 +1,14 @@
 
 const {actionWrapper} = require('./1.trycatch-action-wrapper')
+const { AppError } = require('../models/error-models/app-error')
+const { ActionSuccess } = require('../models/action-success')
 var express = require('express')
 const fileUploadRouter = express.Router()
 const fs = require('fs')
-const { AppError } = require('../models/error-models/app-error')
-const { ActionSuccess } = require('../models/action-success')
 const path = require('path')
+const db = require('mongoose')
+const { FileSchema } = require('../database/models')
+const FileModel = db.model('File', FileSchema, 'File')
 
 function isFileExists( filePath ) {
   try {
@@ -42,13 +45,13 @@ function getFileUniqueName( fileName, sessionID ) {
 
 // Multiple file upload:  Registering a new session for this request
 //
-fileUploadRouter.post('/start',( req, res ) => {
+fileUploadRouter.post('/start', actionWrapper( async( req, res ) => {
 
   var newSession = { id: Date.now().toString(), }
   appSessions[newSession.id] = newSession
 
   res.send({ sessionID: newSession.id, maxChunkSize: fileUploadLimit - 10000 })
-})
+}))
 
 // Multiple file upload: Close this 'File Upload Session' 
 //
@@ -61,7 +64,7 @@ fileUploadRouter.post('/close/:sessionID', actionWrapper( async ( req, res, next
 
 // Chunk file upload:  Request to start uploading a file
 //                     register a new TEMPID for this file
-fileUploadRouter.post('/start/:sessionID/:fileName', actionWrapper(async ( req, res, next ) => {
+fileUploadRouter.post('/start/:sessionID/:fileName/:fileSize', actionWrapper(async ( req, res, next ) => {
 
   var fileName = req.params.fileName, session = appSessions[req.params.sessionID]
   if (! session){
@@ -69,7 +72,7 @@ fileUploadRouter.post('/start/:sessionID/:fileName', actionWrapper(async ( req, 
   }
   // add to session
   var tempID = getFileUniqueName('TEMP', session.id )
-  appSessions[session.id][tempID] = { name: req.params.fileName }
+  appSessions[session.id][tempID] = { name: req.params.fileName, size: req.params.fileSize }
   res.status(200).send({ tempID })
 }))
 
@@ -122,18 +125,28 @@ fileUploadRouter.post('/finish/:sessionID/:tempID', actionWrapper( async ( req, 
   // Rename the Temp file ->to-> upload file name
   // and give the new file an unique ID
   var session = appSessions[req.params.sessionID], file = session[req.params.tempID]
-  var tempFileName = path.join(__dirname, '/uploads/', req.params.tempID),
-      fileName     = path.join(__dirname, '/uploads/', getFileUniqueName( file.name, session.id ))
-  fs.rename( tempFileName, fileName, function(err) {
+  var uniqueFileName = getFileUniqueName( file.name, session.id )
+  var tempFile    = path.join(__dirname, '/uploads/', req.params.tempID),
+      newFile     = path.join(__dirname, '/uploads/', uniqueFileName)
+  fs.rename( tempFile, newFile, async function(err) {
 
       if ( err )
         next(new AppError(err, 500)) 
-      else
+      else {
         res.status(200).send(new ActionSuccess())
+        var dbInstance = new FileModel({
+          fileID: uniqueFileName,
+          file_name: file.name,
+          created_date: Date.now(),
+          size: file.size,
+          type: path.extname(file.name),
+        })
+        await dbInstance.save()
+      }
   });
 }))
 
 ////////////////////////////////////////////////////////////////
 
 
-module.exports = { fileUploadRouter }
+module.exports = { fileUploadRouter, isFileExists }

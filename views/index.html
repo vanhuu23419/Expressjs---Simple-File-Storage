@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My FTP Server</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
   <link href="https://cdn.jsdelivr.net/npm/remixicon@2.5.0/fonts/remixicon.css" rel="stylesheet">
   <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script type="text/javascript" src="https://rawgit.com/vitmalina/w2ui/master/dist/w2ui.min.js"></script>
@@ -15,331 +17,99 @@
   <link rel="stylesheet" href="./styles/main.css">
 </head>
 
-<body>
+<body style="background-image: url('./assets/background.jpg');background-size: contain;">
 
-  <input id="uploadInput" type="file" multiple class="d-none">
-  <div id="fileUploadGrid" class="fileUploadGrid" style="max-width: 90vw;width: 800px; height: 440px; overflow: hidden;"></div>
+  <input type="file" id="uploadInput" hidden multiple>
+  <div class="d-flex align-items-center justify-content-center" style="width: 100vw;height: 100vh;">
 
+    <div id="layout" style="width: 1000px;height: 600px" class=""></div>
+  </div>
+
+  <script src="./scripts/FileUploader.js"></script>
   <script src="./scripts/main.js"></script>
 
-  <script type="text/javascript">
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageName = urlParams.get('page') ?? 'allFiles'
 
-    const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
-
-    const FileUploader = {
-      grid: 'fileUploadGrid',
-      files: [],
-      uploadStatus: { status: 'waiting', index: 0, chunkIndex: 0 }, 
-      canUpload: function() {
-        return this.files.length > 0
-      },
-      onAddFile: function(files) {
-        if (files.length == 0) {
-          return
-        }
-        for(let i = 0; i<files.length; ++i){
-          // Because the FileUploader.files will change
-          // This File ID shared between FileUploader.Files and FileUploader Grid
-          // and later will be used to search & update the Grid
-          files[i].fileID = 'fid-'+ Date.now() 
-          this.addFile( files[i] )     
-        }
-        // Clear Input Value, so we could add new files
-        $('#uploadInput').val(null)
-        // Update Toolbar View
-        $('#startUpload').prop('disabled', false)
-      },
-      addFile: function(file) {
-        var that = this
-        that.files.push(file)
-        w2ui[that.grid].add({ 
-          fileID: file.fileID,
-          recid: file.fileID, fileName: file.name, progress: 0, status: 'waiting' 
-        })
-      },
-      uploadChunk: async function (tempID, file, start, chunkSize) {
-        var that = this
-        // Paused
-        if (that.uploadStatus.status == 'paused' || that.uploadStatus.status == 'removed') {
-          return
-        }
-        var base64Data = await readDataAsync(file.slice(start, start + chunkSize))
-        // Replace characters which ommitted when sending XHR
-        if (base64Data) {
-          base64Data = base64Data.substr(base64Data.indexOf(',') + 1)
-          base64Data = base64Data.replace(/&/g, '[AMP]')
-          base64Data = base64Data.replace(/\+/g, '[PLUS]')
-        }
-        // Upload chunk
-        var result = await fetch('/api/v1/file/upload/' + tempID, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: "chunk=" + base64Data
-        });
-
-        var { status, message } = await result.json()
-        if (status == 'failed') {
-          return { error: message }
-        }
-        return { }
-      },
-      uploadFile: async function (index) {
-        var that = this
-        if (['paused', 'removed'].includes(that.uploadStatus.status)) {
-          return
-        }
-        // Request new TEMPID if not started yet
-        if ( that.uploadStatus.status == 'waiting' ) {
-          var fetchResult 
-          = await fetch('/api/v1/file/upload/start/'+that.sessionID+'/'+that.files[index].name, {method: 'POST'}) 
-          var {tempID, status, message } = await fetchResult.json()
-          // update FileUploader status
-          that.uploadStatus = { fileID: that.files[index].fileID, status: 'uploading', tempID, chunkIndex: 0 }
-          // upload Progress bar
-          w2ui[that.grid].get(that.files[index].fileID).status = 'uploading'
-          w2ui[that.grid].get(that.files[index].fileID).progress = 0
-          w2ui[that.grid].refresh()
-        }
-        // Uploading
-        var { chunkIndex, tempID } = that.uploadStatus;
-        while (true) {
-          // Paused or Removed
-          if (['paused', 'removed'].includes(that.uploadStatus.status)) {
-            return
-          }
-          // check loop condition ( it change in runtime due to user interaction )
-          if (! that.files[index] || ! (chunkIndex < that.files[index].size - 1)) {
-            break
-          }
-          // upload Progress bar
-          w2ui[that.grid].get(that.files[index].fileID).progress = Math.round((chunkIndex/that.files[index].size)*100)
-          w2ui[that.grid].refresh()
-          // upload chunk
-          await that.uploadChunk(tempID, that.files[index], chunkIndex, that.maxChunkSize)
-          // Paused or Removed
-          if (['paused', 'removed'].includes(that.uploadStatus.status)) {
-            return
-          }
-          //
-          chunkIndex += that.maxChunkSize
-          that.uploadStatus.chunkIndex = chunkIndex
-          console.log('uploaded chunk...')
-          await sleep(1000)
-        }
-        // Request to finish upload this file
-        await fetch(`/api/v1/file/upload/finish/${that.sessionID}/${tempID}`, { method: 'POST' })
-        // upload Progress bar
-        w2ui[that.grid].get(that.files[index].fileID).status = 'completed'
-        w2ui[that.grid].refresh()
-        //
-        return {}
-      },
-      uploadAllFiles: async function() {
-        var that = this
-        // Uploading
-        debugger
-        var uploadIndex = that.files.findIndex( p => p.fileID == that.uploadStatus.fileID )
-        uploadIndex = (uploadIndex == -1) ? 0 : uploadIndex
-        for( let i = uploadIndex; i < that.files.length; ++i) {
-          console.log(`Uploading: ${that.files[uploadIndex].name}`)
-          // upload file
-          await that.uploadFile( i )
-          //
-          if (that.uploadStatus.status == 'paused') {
-            return
-          }
-          if ( that.uploadStatus.status == 'removed') {
-            that.uploadStatus = { status: 'waiting' }
-            return
-          }
-          // Prepare for next file
-          that.uploadStatus = { status: 'waiting' }
-        }
-        // All file's data has been upload
-        // make request to finish & clear this session
-        await fetch(`/api/v1/file/upload/close/${that.sessionID}`, { method: 'POST' })
-        alert('Thành công')
-        that.files = []
-        that.sessionID = null
-        // Update Toolbar View
-        w2ui[that.grid].toolbar.hide('pause')
-        w2ui[that.grid].toolbar.show('uploadAll')
-        $('#startUpload').attr('disabled', 'disabled')
-      },
-      startUpload: async function() {
-        var that = this
-        // Request: Registering a new session for uploading these files
-        var data = await fetch('/api/v1/file/upload/start', { method: 'POST' })
-        var { sessionID, maxChunkSize, status, message } = await data.json()
-        if ( status == 'failed') {
-          alert(message??'Something went wrong. Please try again');
-          return;
-        }
-        // Change Toolbar View
-        w2ui[that.grid].toolbar.show('pause')
-        w2ui[that.grid].toolbar.hide('uploadAll')
-        // Start Upload
-        that.sessionID = sessionID
-        that.maxChunkSize = maxChunkSize
-        that.uploadAllFiles()
-      },
-      pauseUpload: function() {
-        if ( this.uploadStatus.status != 'uploading'){
-          return
-        }
-        // Change Upload Status
-        this.uploadStatus.status = 'paused'
-        // Update Toolbar View
-        $('#'+this.grid).addClass('paused')
-        console.log('paused')
-        // upload Progress bar
-        w2ui[this.grid].get(this.uploadStatus.fileID).status = 'paused'
-        w2ui[this.grid].refresh()
-        //
-      },
-      continueUpload: async function() {
-        if ( this.uploadStatus.status != 'paused'){
-          return
-        }
-        // Change Upload Status
-        this.uploadStatus.status = 'uploading'
-        // Update Toolbar View
-        $('#'+this.grid).removeClass('paused')
-        console.log('uploading')
-        // upload Progress bar
-        w2ui[this.grid].get(this.uploadStatus.fileID).status = 'uploading'
-        w2ui[this.grid].refresh()
-        //
-        // Continue Upload
-        this.uploadAllFiles()
-      },
-      removeSelected: async function() {
-        var that = this
-        var selectedFIDs = w2ui[that.grid].getSelection()
-        if (selectedFIDs.length == 0) {
-          alert('Please select the items that you want to remove!')
-          return
-        }
-        var proceed = confirm("Are you sure you want to proceed?");
-        if (!proceed) {
-          return
-        } 
-        selectedFIDs.forEach( async (FID) => {
-          if (that.uploadStatus.fileID == FID) {
-            if (['uploading', 'paused'].includes(that.uploadStatus.status)) {
-              await fetch(`/api/v1/file/upload/cancel/${that.sessionID}/${that.uploadStatus.tempID}`, {method:'post'})
-              that.uploadStatus.status = 'removed'
-              // Update Toolbar View
-              $('#'+this.grid).removeClass('paused')
-              w2ui[that.grid].toolbar.hide('pause')
-              w2ui[that.grid].toolbar.show('uploadAll')
-            }
-          }
-
-          // remove from files
-          var indexOf = that.files.findIndex(p => p.fileID == FID)
-          if (indexOf != -1){
-            that.files.splice(indexOf,1)
-          }
-          // update grid
-          var recIndex = w2ui[that.grid].get(FID, true)
-          w2ui[that.grid].records.splice(recIndex, 1)
-          w2ui[that.grid].unselect(recIndex)
-          w2ui[that.grid].refresh()
-        })
-      },
-      init: function() {
-        var that = this
-        // Add files event
-        $('#uploadInput').on('change', (e) => that.onAddFile(e.target.files))
-        // Hide toolbar action
-        w2ui[that.grid].toolbar.hide('pause')
-      },
+    function headerContent() {
+      var pathName = window.location.pathname.split('/')[1];
+      var headers = {
+        'allFiles': 'All files',
+        'uploadFiles': 'Upload new files'
+      }
+      return `
+      <div class="d-flex align-items-center p-6" style="border: 1px solid #e5e5e5">
+        <i class="ri-home-7-line fs-16 me-6"></i>
+        <span> Home </span>
+        <span class="mx-10 text-secondary"> / </span>
+        <span> ${headers[pageName]} </span>
+      </div>
+      `
     }
-    
+
+    function dashboardContent() {
+      var pathName = window.location.pathname.split('/')[1];
+      return `
+      <div class="d-flex align-items-center justify-content-center" style="height:40px;background-color:#6765ff;color:white">
+            <span class="uppercase fs-16 ms-10"> File Storage </span>
+      </div>
+      <div class="mt-30 p-6 d-flex flex-column"> 
+        <ul class="dash-menu__items ul-0 d-flex flex-column">
+          <li class="${(pageName == 'allFiles') ? 'current' : ''}"><a href="?page=allFiles" class="anchor-0 d-flex align-items-center">
+            <i class="ri-folders-line fs-20 me-10"></i> 
+            <span> Your files </span>
+          </a></li>
+          <li class="${(pageName == 'uploadFiles') ? 'current' : ''}"><a href="?page=uploadFiles" class="anchor-0 d-flex align-items-center">
+            <i class="ri-folder-upload-line fs-20 me-10"></i>
+            <span> Upload new files </span>
+          </a></li> 
+        </ul>
+      </div>
+      <div class="p-6 position-absolute w-100" style="bottom: 0%"> 
+        <div class="py-16 d-flex flex-column align-items-center justify-content-center"> 
+          <div class="circle-icon fs-32" style="background-color:#f5f5f5"><i class="ri-user-3-line"></i></div>
+          <span class="mt-6"> Văn Hữu </span> 
+          <a href="" class="fs-14" style=""> Logout </a> 
+        </div>  
+      </div>
+      `
+    }
 
   </script>
 
-  <script>
-        // Init W2ui Grid
-    
-        $(function () {
-      $('#fileUploadGrid').w2grid({
-        name: 'fileUploadGrid',
-        show: { toolbar: true, lineNumbers: true,searchAll: false, toolbarReload: false, toolbarSearch: false, selectColumn: true, },
-        multiSelect: true,
-        toolbar: {
-          style: 'height: 44px; padding-top: 2px',
-          items: [
-            { type: 'html', id: 'addFiles', 
-              html: `
-                <button id="addFilesBtn" class="btn-0 py-6 px-10 bg-primary txt-white" onclick="$('#uploadInput').click()"> 
-                  Add file
-                  <i class="ri-add-fill fs-16"></i>
-                </button>`, 
-            },
-            { type: 'html', id: 'removeAll', 
-              html: `
-                <button id="removeSelectedBtn" class="btn-0 py-6 px-10 bg-danger txt-white" onclick="FileUploader.removeSelected()"> 
-                  Remove Selected
-                  <i class="ri-close-fill fs-16"></i>
-                </button>`, 
-            },
-            { type: 'break' },
-            { type: 'html', id: 'uploadAll', 
-              html: `
-                <button id="startUpload" class="btn-0 py-6 px-10 bg-warning txt-white" onclick="FileUploader.startUpload()" 
-                  ${(FileUploader.canUpload()? '' : 'disabled="disabled"')}"> 
-                  Start Upload
-                  <i class="ri-folder-upload-line fs-16"></i>
-                </button>
-              `, 
-            },
-            { type: 'html', id: 'pause', 
-              html: `
-                <button id="pauseBtn" class="btn-0 py-6 px-10 bg-secondary txt-white" onclick="FileUploader.pauseUpload()"> 
-                  Pause
-                  <i class="ri-pause-circle-fill fs-20"></i>
-                </button>
-                <button id="continueBtn" class="btn-0 py-6 px-10 bg-secondary txt-white" onclick="FileUploader.continueUpload()"> 
-                  Continue
-                  <i class="ri-play-circle-fill fs-20"></i>
-                </button>`, 
-            },
-            
-          ],
-        },
-        columns: [
-          { field: 'fileName', text: 'File Name', editable: false },
-          { field: 'progress', text: 'Progress', size: '210px', editable: false,
-            render: function(rec) {
-              if (rec.status == 'waiting') {
-                return `<span class="txt-secondary"> <i>wating for upload</i> </span>`
-              }
-              if (rec.status == 'completed') {
-                return `<span class="txt-primary"> <i> completed </i> </span>`
-              }
-              return `
-                <div class="d-flex align-items-center"> 
-                  <progress max="100" value="${rec.progress}" style="width: 150px; height: 20px"></progress>
-                  <span class="ms-10">`+ 
-                    (
-                      (rec.status == 'paused') ? 
-                        `<span class="txt-wanring"> <i> paused </i> </span>` : 
-                        `- ${rec.progress}%`
-                    ) 
-                  +`</span>
-                </div>
-              `
-            } 
-          },
-        ],
+  <script type="text/javascript">
+    $( async function () {
+
+      // Render Layout
+      // 
+      var pstyle = 'margin:1px;background-color: white;';
+      $('#layout').w2layout({
+        name: 'layout',
+        panels: [
+          { type: 'left', size: 200, style: pstyle + 'border: 1px solid #e5e5e5;', html: () => dashboardContent() },
+          { type: 'main', style: 'background-color: transparent', overflow: 'hidden' },
+        ]
       });
-    
-      FileUploader.init()
+      $().w2layout({
+        name: 'layout2',
+        panels: [
+          { type: 'top', size: 40, style: pstyle, html: () => headerContent() },
+          { type: 'main', style: pstyle + 'border: 1px solid #e5e5e5;'},
+        ]
+      });
+      w2ui['layout'].html('main', w2ui['layout2']);
+
+      // Render Main Content
+      //
+      if (pageName == 'uploadFiles') {
+        renderFileUploadGrid()
+      }
+      else if( ! pageName || pageName == 'allFiles') {
+        await renderFileManagerGrid()
+      }
     });
   </script>
 
 </body>
-
 </html>
