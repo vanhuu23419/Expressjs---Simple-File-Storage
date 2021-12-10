@@ -6,9 +6,8 @@ const { Schema } = db
 //
 
 const SessionSchema = new Schema({
-  init_time: String,
-  expire: String,
-  data: String
+  jsonData: String,
+  SID: String
 })
 
 
@@ -21,8 +20,13 @@ const FileSchema = new Schema({
   type: String,
 })
 
+const UserSchema = new Schema({
+  username: String,
+  hash_password: String
+})
+
 //
 //
 //
 
-module.exports = { SessionSchema, FileSchema }
+module.exports = { SessionSchema, FileSchema, UserSchema }
