@@ -1,7 +1,7 @@
 # Expressjs---Simple-File-Storage
 
 
-Please watch the demo:
+Click to watch demo:
 
 [![Watch the video](https://i.ibb.co/cL8YD6J/Capture.jpg)](https://youtu.be/vt5fpE0bzSY)
 
