@@ -3,7 +3,7 @@
 
 Click to watch demo:
 
-[![Watch the video](https://i.ibb.co/cL8YD6J/Capture.jpg)](https://youtu.be/vt5fpE0bzSY)
+[![Watch the video](https://i.ibb.co/cL8YD6J/Capture.jpg)](https://www.youtube.com/watch?v=F84WRqHvGQY&t=86s)
 
 This is a simple file manager app. I made this app for my own education.
 
